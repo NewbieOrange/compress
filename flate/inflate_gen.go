@@ -102,6 +102,10 @@ readLiteral:
 			val := decCodeToLen[(v - 257)]
 			length = int(val.length) + 3
 			n := uint(val.extra)
+			if f.deflate64 && v == 285 {
+				length = 3
+				n = 16
+			}
 			for fnb < n {
 				c, err := fr.ReadByte()
 				if err != nil {
