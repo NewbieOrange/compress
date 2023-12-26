@@ -301,8 +301,9 @@ const (
 // Decompress state.
 type decompressor struct {
 	// Input source.
-	r       Reader
-	roffset int64
+	r         Reader
+	roffset   int64
+	deflate64 bool
 
 	// Huffman decoders for literal/length, distance.
 	h1, h2 huffmanDecoder
@@ -809,6 +810,27 @@ func NewReader(r io.Reader) io.ReadCloser {
 	return &f
 }
 
+// NewReader64 returns a new ReadCloser that can be used
+// to read the uncompressed version of r.
+// If r does not also implement io.ByteReader,
+// the decompressor may read more data than necessary from r.
+// It is the caller's responsibility to call Close on the ReadCloser
+// when finished reading.
+//
+// The ReadCloser returned by NewReader64 also implements Resetter.
+func NewReader64(r io.Reader) io.ReadCloser {
+	fixedHuffmanDecoderInit()
+
+	var f decompressor
+	f.r = makeReader(r)
+	f.deflate64 = true
+	f.bits = new([maxNumLit + maxNumDist]int)
+	f.codebits = new([numCodes]int)
+	f.step = nextBlock
+	f.dict.init(maxMatchOffset, nil)
+	return &f
+}
+
 // NewReaderDict is like NewReader but initializes the reader
 // with a preset dictionary. The returned Reader behaves as if
 // the uncompressed data stream started with the given dictionary,
@@ -821,6 +843,26 @@ func NewReaderDict(r io.Reader, dict []byte) io.ReadCloser {
 
 	var f decompressor
 	f.r = makeReader(r)
+	f.bits = new([maxNumLit + maxNumDist]int)
+	f.codebits = new([numCodes]int)
+	f.step = nextBlock
+	f.dict.init(maxMatchOffset, dict)
+	return &f
+}
+
+// NewReaderDict64 is like NewReader64 but initializes the reader
+// with a preset dictionary. The returned Reader behaves as if
+// the uncompressed data stream started with the given dictionary,
+// which has already been read. NewReaderDict64 is typically used
+// to read data compressed by NewWriterDict.
+//
+// The ReadCloser returned by NewReader64 also implements Resetter.
+func NewReaderDict64(r io.Reader, dict []byte) io.ReadCloser {
+	fixedHuffmanDecoderInit()
+
+	var f decompressor
+	f.r = makeReader(r)
+	f.deflate64 = true
 	f.bits = new([maxNumLit + maxNumDist]int)
 	f.codebits = new([numCodes]int)
 	f.step = nextBlock
