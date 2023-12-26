@@ -26,7 +26,7 @@ const (
 	maxNumDist = 32
 	numCodes   = 19 // number of codes in Huffman meta-code
 
-	debugDecode = true
+	debugDecode = false
 )
 
 // Value of length - 3 and extra bits.
