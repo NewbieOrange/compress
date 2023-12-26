@@ -40,7 +40,7 @@ const (
 	tableShift      = 32 - tableBits // Right-shift to get the tableBits most significant bits of a uint32.
 	baseMatchOffset = 1              // The smallest match offset
 	baseMatchLength = 3              // The smallest match length per the RFC section 3.2.5
-	maxMatchOffset  = 1 << 15        // The largest match offset
+	maxMatchOffset  = 1 << 16        // The largest match offset
 
 	bTableBits   = 17                                               // Bits used in the big tables
 	bTableSize   = 1 << bTableBits                                  // Size of the table
