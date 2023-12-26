@@ -23,7 +23,7 @@ const (
 	// additional proviso in section 3.2.5 which implies that distance codes
 	// 30 and 31 should never occur in compressed data.
 	maxNumLit  = 286
-	maxNumDist = 30
+	maxNumDist = 32
 	numCodes   = 19 // number of codes in Huffman meta-code
 
 	debugDecode = false
