@@ -120,7 +120,7 @@ This will effectively make it run without allocations after a warmup period.
 To make it run completely without allocations, supply a destination buffer with space for all content.   
 
 ```Go
-import "github.com/klauspost/compress/zstd"
+import "github.com/NewbieOrange/compress/zstd"
 
 // Create a writer that caches compressors.
 // For this operation type we supply a nil Reader.
@@ -274,7 +274,7 @@ There are two main usages of the package for these. Both of them are accessed by
 For streaming use a simple setup could look like this:
 
 ```Go
-import "github.com/klauspost/compress/zstd"
+import "github.com/NewbieOrange/compress/zstd"
 
 func Decompress(in io.Reader, out io.Writer) error {
     d, err := zstd.NewReader(in)
@@ -300,7 +300,7 @@ as it is being requested only.
 For decoding buffers, it could look something like this:
 
 ```Go
-import "github.com/klauspost/compress/zstd"
+import "github.com/NewbieOrange/compress/zstd"
 
 // Create a reader that caches decompressors.
 // For this operation type we supply a nil Reader.

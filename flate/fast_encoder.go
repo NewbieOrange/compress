@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"math/bits"
 
-	"github.com/klauspost/compress/internal/le"
+	"github.com/NewbieOrange/compress/internal/le"
 )
 
 type fastEnc interface {

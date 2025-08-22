@@ -6,8 +6,8 @@ import (
 	"io"
 	"sync"
 
-	"github.com/klauspost/compress/gzhttp/writer"
-	"github.com/klauspost/compress/gzip"
+	"github.com/NewbieOrange/compress/gzhttp/writer"
+	"github.com/NewbieOrange/compress/gzip"
 )
 
 // gzipWriterPools stores a sync.Pool for each compression level for reuse of

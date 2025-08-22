@@ -14,8 +14,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/klauspost/compress/s2"
-	"github.com/klauspost/compress/zstd"
+	"github.com/NewbieOrange/compress/s2"
+	"github.com/NewbieOrange/compress/zstd"
 )
 
 type match struct {

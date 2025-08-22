@@ -86,7 +86,7 @@ package main
 
 import (
 	"github.com/klaupost/compress/dict"
-	"github.com/klauspost/compress/zstd"
+	"github.com/NewbieOrange/compress/zstd"
 )
 
 func main() {

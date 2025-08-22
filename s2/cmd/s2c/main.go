@@ -21,9 +21,9 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/klauspost/compress/s2"
-	"github.com/klauspost/compress/s2/cmd/internal/filepathx"
-	"github.com/klauspost/compress/s2/cmd/internal/readahead"
+	"github.com/NewbieOrange/compress/s2"
+	"github.com/NewbieOrange/compress/s2/cmd/internal/filepathx"
+	"github.com/NewbieOrange/compress/s2/cmd/internal/readahead"
 )
 
 var (

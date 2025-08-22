@@ -5,7 +5,7 @@ import (
 	"math"
 	"sync"
 
-	"github.com/klauspost/compress/internal/le"
+	"github.com/NewbieOrange/compress/internal/le"
 )
 
 const (

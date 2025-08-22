@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/klauspost/compress/internal/fuzz"
+	"github.com/NewbieOrange/compress/internal/fuzz"
 )
 
 // Fuzzing tweaks:

@@ -85,7 +85,7 @@ package main
 import (
 	"io"
 	"net/http"
-	"github.com/klauspost/compress/gzhttp"
+	"github.com/NewbieOrange/compress/gzhttp"
 )
 
 func main() {
@@ -112,8 +112,8 @@ import (
 	"log"
 	"net/http"
 	
-	"github.com/klauspost/compress/gzhttp"
-	"github.com/klauspost/compress/gzip"
+	"github.com/NewbieOrange/compress/gzhttp"
+	"github.com/NewbieOrange/compress/gzip"
 )
 
 func main() {

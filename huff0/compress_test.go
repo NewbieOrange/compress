@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/klauspost/compress/flate"
-	"github.com/klauspost/compress/zip"
+	"github.com/NewbieOrange/compress/flate"
+	"github.com/NewbieOrange/compress/zip"
 )
 
 type inputFn func() ([]byte, error)
