@@ -157,7 +157,7 @@ func (o options) generateBody(name string, executeSingleTriple func(ctx *execute
 		Load(br.Field("value"), brValue)
 		Load(br.Field("bitsRead"), brBitsRead)
 		Load(br.Field("in").Base(), brPointer)
-		Load(br.Field("in").Len(), brOffset)
+		Load(br.Field("cursor"), brOffset)
 		ADDQ(brOffset, brPointer) // Add current offset to read pointer.
 		MOVQ(brPointer, brPointerStash)
 	}
@@ -220,7 +220,7 @@ func (o options) generateBody(name string, executeSingleTriple func(ctx *execute
 				ADDQ(tmp, ec.histBasePtr) // Note: we always copy from &hist[len(hist) - v]
 			}
 
-			Comment("Calculate poiter to s.out[cap(s.out)] (a past-end pointer)")
+			Comment("Calculate pointer to s.out[cap(s.out)] (a past-end pointer)")
 			ADDQ(ec.outBase, ec.outEndPtr)
 
 			Comment("outBase += outPosition")
@@ -438,7 +438,7 @@ func (o options) generateBody(name string, executeSingleTriple func(ctx *execute
 	br := Dereference(Param("br"))
 	Store(brValue, br.Field("value"))
 	Store(brBitsRead.As8(), br.Field("bitsRead"))
-	Store(brOffset, br.Field("in").Len())
+	Store(brOffset, br.Field("cursor"))
 
 	if !o.useSeqs {
 		Comment("Update the context")

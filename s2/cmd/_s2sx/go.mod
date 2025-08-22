@@ -1,6 +1,6 @@
 module github.com/klauspost/compress/s2/cmd/s2sx
 
-go 1.19
+go 1.22
 
 require github.com/klauspost/compress v1.11.9
 

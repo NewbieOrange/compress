@@ -81,7 +81,7 @@ func main() {
 	o.maxSkip = 100
 	o.genEncodeBetterBlockAsm("encodeSnappyBetterBlockAsm", 17, 14, 7, 7, limit14B)
 	o.maxSkip = 0
-	o.genEncodeBetterBlockAsm("encodeSnappyBetterBlockAsm64K", 16, 14, 7, 7, 64<<10-1)
+	o.genEncodeBetterBlockAsm("encodeSnappyBetterBlockAsm64K", 16, 13, 7, 7, 64<<10-1)
 	o.genEncodeBetterBlockAsm("encodeSnappyBetterBlockAsm12B", 14, 12, 6, 6, limit12B)
 	o.genEncodeBetterBlockAsm("encodeSnappyBetterBlockAsm10B", 12, 10, 5, 6, limit10B)
 	o.genEncodeBetterBlockAsm("encodeSnappyBetterBlockAsm8B", 10, 8, 4, 6, limit8B)
@@ -146,6 +146,15 @@ func assert(fn func(ok LabelRef)) {
 	}
 }
 
+type regTable struct {
+	r    reg.Register
+	disp int
+}
+
+func (r regTable) Idx(idx reg.GPVirtual, scale uint8) Mem {
+	return Mem{Base: r.r, Index: idx, Scale: scale, Disp: r.disp}
+}
+
 type options struct {
 	snappy       bool
 	bmi1         bool
@@ -163,7 +172,15 @@ func (o options) genEncodeBlockAsm(name string, tableBits, skipLog, hashBytes, m
 	if o.skipOutput {
 		dstTxt = ""
 	}
-	TEXT(name, 0, "func("+dstTxt+"src []byte) int")
+
+	var tableSize = 4 * (1 << tableBits)
+	// Memzero needs at least 128 bytes.
+	if tableSize < 128 {
+		panic("tableSize must be at least 128 bytes")
+	}
+
+	arrPtr := fmt.Sprintf(",tmp *[%d]byte", tableSize)
+	TEXT(name, 0, "func("+dstTxt+"src []byte"+arrPtr+") int")
 	Doc(name+" encodes a non-empty src to a guaranteed-large-enough dst.",
 		fmt.Sprintf("Maximum input %d bytes.", maxLen),
 		"It assumes that the varint-encoded length of the decompressed bytes has already been written.", "")
@@ -173,7 +190,6 @@ func (o options) genEncodeBlockAsm(name string, tableBits, skipLog, hashBytes, m
 	o.maxOffset = maxLen - 1
 	var literalMaxOverhead = maxLitOverheadFor(maxLen)
 
-	var tableSize = 4 * (1 << tableBits)
 	// Memzero needs at least 128 bytes.
 	if tableSize < 128 {
 		panic("tableSize must be at least 128 bytes")
@@ -209,8 +225,8 @@ func (o options) genEncodeBlockAsm(name string, tableBits, skipLog, hashBytes, m
 	// nextSTempL keeps nextS while other functions are being called.
 	nextSTempL := AllocLocal(4)
 
-	// Alloc table last
-	table := AllocLocal(tableSize)
+	// Load pointer to temp table
+	table := regTable{r: Load(Param("tmp"), GP64())}
 
 	dst := GP64()
 	if !o.skipOutput {
@@ -236,7 +252,7 @@ func (o options) genEncodeBlockAsm(name string, tableBits, skipLog, hashBytes, m
 		iReg := GP64()
 		MOVQ(U32(tableSize/8/16), iReg)
 		tablePtr := GP64()
-		LEAQ(table, tablePtr)
+		MOVQ(table.r, tablePtr)
 		zeroXmm := XMM()
 		PXOR(zeroXmm, zeroXmm)
 
@@ -418,18 +434,37 @@ func (o options) genEncodeBlockAsm(name string, tableBits, skipLog, hashBytes, m
 			}
 			Label("repeat_extend_back_end_" + name)
 
+			{
+				// tmp = s-nextEmit
+				tmp := GP64()
+				MOVL(base.As32(), tmp.As32())
+				SUBL(nextEmitL, tmp.As32())
+				// tmp = &dst + s-nextEmit
+				LEAQ(Mem{Base: dst, Index: tmp, Scale: 1, Disp: literalMaxOverhead}, tmp)
+				CMPQ(tmp, dstLimitPtrQ)
+				JB(LabelRef("repeat_dst_size_check_" + name))
+				ri, err := ReturnIndex(0).Resolve()
+				if err != nil {
+					panic(err)
+				}
+				MOVQ(U32(0), ri.Addr)
+				if o.avx2 {
+					VZEROUPPER()
+				}
+				RET()
+			}
+			Label("repeat_dst_size_check_" + name)
+
 			// Base is now at start. Emit until base.
 			// d += emitLiteral(dst[d:], src[nextEmit:base])
-			if true {
-				o.emitLiteralsDstP(nextEmitL, base, src, dst, "repeat_emit_"+name)
-			}
+			o.emitLiteralsDstP(nextEmitL, base, src, dst, "repeat_emit_"+name)
 
 			// Extend forward
 			{
 				// s += 4 + checkRep
 				ADDL(U8(4+checkRep), s)
 
-				if true {
+				{
 					// candidate := s - repeat + 4 + checkRep
 					MOVL(s, candidate)
 					SUBL(repeatL, candidate) // candidate = s - repeat
@@ -458,7 +493,7 @@ func (o options) genEncodeBlockAsm(name string, tableBits, skipLog, hashBytes, m
 				}
 			}
 			// Emit
-			if true {
+			{
 				// length = s-base
 				length := GP32()
 				MOVL(s, length)
@@ -602,7 +637,7 @@ func (o options) genEncodeBlockAsm(name string, tableBits, skipLog, hashBytes, m
 	Label("match_extend_back_end_" + name)
 
 	// Bail if we exceed the maximum size.
-	if true {
+	{
 		// tmp = s-nextEmit
 		tmp := GP64()
 		MOVL(s, tmp.As32())
@@ -836,7 +871,17 @@ func maxLitOverheadFor(n int) int {
 }
 
 func (o options) genEncodeBetterBlockAsm(name string, lTableBits, sTableBits, skipLog, lHashBytes, maxLen int) {
-	TEXT(name, 0, "func(dst, src []byte) int")
+	var lTableSize = 4 * (1 << lTableBits)
+	var sTableSize = 4 * (1 << sTableBits)
+	tableSize := lTableSize + sTableSize
+
+	// Memzero needs at least 128 bytes.
+	if tableSize < 128 {
+		panic("tableSize must be at least 128 bytes")
+	}
+	arrPtr := fmt.Sprintf(", tmp *[%d]byte", tableSize)
+
+	TEXT(name, 0, "func(dst, src []byte"+arrPtr+") int")
 	Doc(name+" encodes a non-empty src to a guaranteed-large-enough dst.",
 		fmt.Sprintf("Maximum input %d bytes.", maxLen),
 		"It assumes that the varint-encoded length of the decompressed bytes has already been written.", "")
@@ -850,9 +895,6 @@ func (o options) genEncodeBetterBlockAsm(name string, lTableBits, sTableBits, sk
 	const sHashBytes = 4
 	o.maxLen = maxLen
 	o.maxOffset = maxLen - 1
-
-	var lTableSize = 4 * (1 << lTableBits)
-	var sTableSize = 4 * (1 << sTableBits)
 
 	// Memzero needs at least 128 bytes.
 	if (lTableSize + sTableSize) < 128 {
@@ -886,9 +928,9 @@ func (o options) genEncodeBetterBlockAsm(name string, lTableBits, sTableBits, sk
 	// nextSTempL keeps nextS while other functions are being called.
 	nextSTempL := AllocLocal(4)
 
-	// Alloc table last, lTab must be before sTab.
-	lTab := AllocLocal(lTableSize)
-	sTab := AllocLocal(sTableSize)
+	table := Load(Param("tmp"), GP64())
+	lTab := regTable{r: table}
+	sTab := regTable{r: table, disp: lTableSize}
 
 	dst := GP64()
 	{
@@ -911,7 +953,7 @@ func (o options) genEncodeBetterBlockAsm(name string, lTableBits, sTableBits, sk
 		iReg := GP64()
 		MOVQ(U32((sTableSize+lTableSize)/8/16), iReg)
 		tablePtr := GP64()
-		LEAQ(lTab, tablePtr)
+		MOVQ(table, tablePtr)
 		zeroXmm := XMM()
 		PXOR(zeroXmm, zeroXmm)
 
@@ -1901,7 +1943,7 @@ func (o options) emitLiteral(name string, litLen, retval, dstBase, litBase reg.G
 	return
 }
 
-// genEmitRepeat generates a standlone emitRepeat.
+// genEmitRepeat generates a standalone emitRepeat.
 func (o options) genEmitRepeat() {
 	TEXT("emitRepeat", NOSPLIT, "func(dst []byte, offset, length int) int")
 	Doc("emitRepeat writes a repeat chunk and returns the number of bytes written.",
@@ -2069,7 +2111,7 @@ func (o options) emitRepeat(name string, length reg.GPVirtual, offset reg.GPVirt
 //	1 <= offset && offset <= math.MaxUint32
 //	4 <= length && length <= 1 << 24
 
-// genEmitCopy generates a standlone emitCopy
+// genEmitCopy generates a standalone emitCopy
 func (o options) genEmitCopy() {
 	TEXT("emitCopy", NOSPLIT, "func(dst []byte, offset, length int) int")
 	Doc("emitCopy writes a copy chunk and returns the number of bytes written.", "",
@@ -2099,7 +2141,7 @@ func (o options) genEmitCopy() {
 //	1 <= offset && offset <= math.MaxUint32
 //	4 <= length && length <= 1 << 24
 
-// genEmitCopy generates a standlone emitCopy
+// genEmitCopy generates a standalone emitCopy
 func (o options) genEmitCopyNoRepeat() {
 	TEXT("emitCopyNoRepeat", NOSPLIT, "func(dst []byte, offset, length int) int")
 	Doc("emitCopyNoRepeat writes a copy chunk and returns the number of bytes written.", "",
@@ -2897,7 +2939,7 @@ func (o options) cvtLZ4BlockAsm(lz4s bool) {
 	TEXT("cvt"+srcAlgo+"Block"+snap, NOSPLIT, "func(dst, src []byte) (uncompressed int, dstUsed int)")
 	Doc("cvt"+srcAlgo+"Block converts an "+srcAlgo+" block to "+dstAlgo, "")
 	Pragma("noescape")
-	o.outputMargin = 10
+	o.outputMargin = 8
 	o.maxOffset = math.MaxUint16
 
 	const (
